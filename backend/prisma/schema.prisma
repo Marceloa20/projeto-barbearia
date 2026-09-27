@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Conexão com o Banco de Dados
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// Cliente 
+/**
+ * Representa o cliente que utiliza o sistema para realizar agendamentos
+ */
+model Cliente {
+  id        Int      @id @default(autoincrement())
+  nome      String
+  email     String   @unique
+  telefone  String
+  senha     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relação: um cliente pode possuir vários agendamentos
+  agendamentos Agendamento[]
+}
+
+// Profissional
+/**
+ * Um profissional pode realizar vários serviços e possuir vários agendamentos.
+ */
+model Profissional {
+  id        Int      @id @default(autoincrement())
+  nome      String
+  email     String   @unique
+  telefone  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relação com os serviços que o profissional realiza.
+  servicos     ProfissionalServico[]
+  // Relação com os agendamentos realizados com o profissional.
+  agendamentos Agendamento[]
+}
+
+// Serviço
+/**
+ * Representa os serviços disponibilizados pela barbearia.
+ */
+model Servico {
+  id             Int      @id @default(autoincrement())
+  nome           String
+  descricao      String? // ? - O campo é opcional.
+  preco          Decimal  @db.Decimal(10, 2) // Decimal é utilizado para representar valores monetários com precisão de duas casas decimais.
+  duracaoMinutos Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relação com os profissionais que realizam este serviço.
+  profissionais ProfissionalServico[]
+  // Relação com os agendamentos deste serviço.
+  agendamentos  Agendamento[]
+}
+
+// Profissional x Serviço
+/**
+ * Tabela intermediária responsável pelo relacionamento
+ * muitos-para-muitos entre Profissional e Servico.
+ * Um profissional pode realizar vários serviços.
+ * Um serviço pode ser realizado por vários profissionais.
+ */
+model ProfissionalServico {
+  profissionalId Int
+  servicoId      Int
+
+  // Relação com o profissional.
+  profissional Profissional @relation(fields: [profissionalId], references: [id])
+  // Relação com o serviço.
+  servico      Servico      @relation(fields: [servicoId], references: [id])
+
+  // Chave primária composta.
+  // Impede que a mesma combinação de profissional e serviço seja cadastrada mais de uma vez.
+  @@id([profissionalId, servicoId])
+}
+
+// STATUS DO AGENDAMENTO
+enum StatusAgendamento {
+  AGENDADO
+  CONCLUIDO
+  CANCELADO
+}
+
+// AGENDAMENTO
+// Representa o agendamento realizado pelo cliente.
+model Agendamento {
+  id       Int               @id @default(autoincrement())
+  dataHora DateTime
+  // Situação atual do agendamento.
+  // Por padrão, todo novo agendamento começa como AGENDADO.
+  status   StatusAgendamento @default(AGENDADO)
+
+  clienteId      Int
+  profissionalId Int
+  servicoId      Int
+
+  // Relação com o cliente.
+  cliente      Cliente      @relation(fields: [clienteId], references: [id])
+  // Relação com o profissional.
+  profissional Profissional @relation(fields: [profissionalId], references: [id])
+  // Relação com o serviço.
+  servico      Servico      @relation(fields: [servicoId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Impede que um profissional possua dois agendamentos
+  // exatamente no mesmo horário.
+  @@unique([profissionalId, dataHora])
+}
